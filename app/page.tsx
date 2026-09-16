@@ -3,7 +3,7 @@
 import { type ComponentType, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, ArrowRight, BarChart3, BedDouble, BookOpen, Brain, BriefcaseBusiness,
-  BusFront, CalendarDays, Check, ChevronRight, Clock3, Dumbbell, Flame, Home as HomeIcon,
+  BusFront, CalendarDays, Check, ChevronRight, Clock3, Dumbbell, Home as HomeIcon,
   Pencil, Plus, Sparkles, Target, TimerReset, Trash2, UsersRound, Utensils,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -81,7 +81,6 @@ export default function Home() {
   const filled = Object.values(day.entries).filter((entry) => entry.text.trim());
   const totalHours = filled.reduce((sum, entry) => sum + durationHours(entry), 0);
   const usefulHours = filled.reduce((sum, entry) => sum + durationHours(entry) * categories[entry.category].score, 0);
-  const deepHours = filled.filter((entry) => entry.category === "deep").reduce((sum, entry) => sum + durationHours(entry), 0);
   const quality = totalHours ? Math.round((usefulHours / totalHours) * 100) : 0;
 
   function changeDate(offset: number) { const next = new Date(selectedDate); next.setDate(next.getDate() + offset); setHydrated(false); setSelectedDate(next); }
@@ -107,16 +106,20 @@ export default function Home() {
 
       <div className="page-shell" id="top">
         <section className="main-column">
-          <div className="date-toolbar">
-            <Button variant="ghost" size="icon" onClick={() => changeDate(-1)} aria-label="Previous day"><ArrowLeft /></Button>
-            <div className="date-button"><CalendarDays /><span><strong>{dateLabel}</strong><small>{sameDay(selectedDate, today) ? "TODAY" : key}</small></span></div>
-            <Button variant="ghost" size="icon" onClick={() => changeDate(1)} aria-label="Next day"><ArrowRight /></Button>
-          </div>
+          <section className="workspace-head">
+            <div className="date-toolbar">
+              <Button variant="ghost" size="icon" onClick={() => changeDate(-1)} aria-label="Previous day"><ArrowLeft /></Button>
+              <div className="date-button"><CalendarDays /><span><strong>{dateLabel}</strong><small>{sameDay(selectedDate, today) ? "TODAY" : key}</small></span></div>
+              <Button variant="ghost" size="icon" onClick={() => changeDate(1)} aria-label="Next day"><ArrowRight /></Button>
+            </div>
+            <Button className="exact-cta" onClick={() => openEditor(new Date().getHours())}><Plus /> Log exact time</Button>
+          </section>
 
-          <section className="hero-panel">
-            <div className="aurora aurora-one" /><div className="aurora aurora-two" />
-            <div className="hero-copy"><p className="eyebrow"><Flame /> YOUR DAY, IN MOTION</p><h1>Make every hour<br /><em>visible.</em></h1><p>Log the real timeline—not just neat one-hour boxes.</p><Button className="exact-cta" onClick={() => openEditor(new Date().getHours())}><Plus /> Log exact time</Button></div>
-            <div className="pulse-orbit" style={{ "--score": `${quality * 3.6}deg` } as CSSProperties}><div><strong>{usefulHours.toFixed(1)}h</strong><span>useful today</span></div><i /><b /></div>
+          <section className="summary-strip" aria-label="Today's summary">
+            <div className="summary-heading"><p>Daily log</p><h1>Today at a glance</h1></div>
+            <div className="summary-metric"><span>Useful time</span><strong>{usefulHours.toFixed(1)}h</strong></div>
+            <div className="summary-metric"><span>Tracked</span><strong>{totalHours.toFixed(1)}h</strong></div>
+            <div className="summary-signal"><div><span>Productive signal</span><strong>{quality}%</strong></div><Progress value={quality} /></div>
           </section>
 
           <label className="intention-card"><Target /><span><small>TODAY&apos;S INTENTION</small><input value={day.intention} onChange={(event) => setDay((current) => ({ ...current, intention: event.target.value }))} placeholder="What would make today count?" maxLength={120} /></span><ChevronRight /></label>
@@ -151,9 +154,7 @@ export default function Home() {
 
         <aside className="insights-column">
           <div className="insights-sticky">
-            <p className="eyebrow dark"><BarChart3 /> LIVE READOUT</p>
-            <div className="metric-hero"><span>Productive signal</span><strong>{quality}%</strong><Progress value={quality} /><small>{usefulHours.toFixed(1)} useful hours from {totalHours.toFixed(1)} tracked</small></div>
-            <div className="metric-grid"><div className="metric-card lime"><Flame /><strong>{deepHours.toFixed(1)}h</strong><span>deep work</span></div><div className="metric-card blue"><Clock3 /><strong>{totalHours.toFixed(1)}h</strong><span>accounted for</span></div></div>
+            <p className="eyebrow dark"><BarChart3 /> TIME BY CATEGORY</p>
             <div className="category-cloud">{Object.entries(categories).map(([value, category]) => { const Icon = category.Icon; const amount = filled.filter((entry) => entry.category === value).reduce((sum, entry) => sum + durationHours(entry), 0); return <div key={value} className={amount ? "category-stat active" : "category-stat"}><i style={{ background: category.color }}><Icon /></i><span>{category.label}</span><strong>{amount ? `${amount.toFixed(1)}h` : "—"}</strong></div>; })}</div>
             <button className="now-button" onClick={jumpToNow}><TimerReset />Jump to current hour</button>
           </div>
