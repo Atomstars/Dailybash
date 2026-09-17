@@ -13,7 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 
 type Category = "deep" | "normal" | "meeting" | "learning" | "gym" | "food" | "chores" | "commute" | "free" | "sleep";
-type Entry = { text: string; category: Category; start: string; end: string };
+type Entry = { text: string; category: Category; start: string; end: string; blockId?: string; rangeStart?: string; rangeEnd?: string };
 type DayLog = { intention: string; reflection: string; entries: Record<number, Entry> };
 type CategoryMeta = { label: string; score: number; color: string; tint: string; Icon: ComponentType<{ className?: string }> };
 
@@ -36,6 +36,17 @@ const dateKey = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1
 const defaultTimes = (hour: number) => ({ start: `${pad(hour)}:00`, end: `${pad((hour + 1) % 24)}:00` });
 const minutes = (time: string) => { const [h, m] = time.split(":").map(Number); return h * 60 + m; };
 const durationHours = (entry: Entry) => { let value = minutes(entry.end) - minutes(entry.start); if (value <= 0) value += 1440; return value / 60; };
+const timeFromMinutes = (value: number) => { const normalized = ((value % 1440) + 1440) % 1440; return `${pad(Math.floor(normalized / 60))}:${pad(normalized % 60)}`; };
+const coveredSlotCount = (start: string, end: string) => { const startMinute = minutes(start); let endMinute = minutes(end); if (endMinute <= startMinute) endMinute += 1440; return Math.ceil(endMinute / 60) - Math.floor(startMinute / 60); };
+function buildSegments(text: string, category: Category, start: string, end: string, blockId: string) {
+  const segments: Record<number, Entry> = {};
+  const startMinute = minutes(start); let endMinute = minutes(end); if (endMinute <= startMinute) endMinute += 1440;
+  for (let cursor = Math.floor(startMinute / 60) * 60; cursor < endMinute; cursor += 60) {
+    const slot = Math.floor(cursor / 60) % 24;
+    segments[slot] = { text, category, start: timeFromMinutes(Math.max(startMinute, cursor)), end: timeFromMinutes(Math.min(endMinute, cursor + 60)), blockId, rangeStart: start, rangeEnd: end };
+  }
+  return segments;
+}
 const displayTime = (time: string) => { const [h, m] = time.split(":").map(Number); return `${h % 12 || 12}:${pad(m)} ${h < 12 ? "AM" : "PM"}`; };
 const sameDay = (a: Date, b: Date) => dateKey(a) === dateKey(b);
 const legacyCategory = (value: string): Category => ({ focus: "deep", progress: "normal", maintenance: "chores", recharge: "free" }[value] as Category) || (value in categories ? value as Category : "normal");
@@ -46,7 +57,9 @@ function normalizeDay(raw: unknown): DayLog {
   const entries: Record<number, Entry> = {};
   Object.entries(value.entries ?? {}).forEach(([slot, candidate]) => {
     const hour = Number(slot); const old = candidate as Partial<Entry>;
-    entries[hour] = { text: old.text ?? "", category: legacyCategory(old.category ?? "normal"), start: old.start ?? defaultTimes(hour).start, end: old.end ?? defaultTimes(hour).end };
+    const entry = { text: old.text ?? "", category: legacyCategory(old.category ?? "normal"), start: old.start ?? defaultTimes(hour).start, end: old.end ?? defaultTimes(hour).end, blockId: old.blockId, rangeStart: old.rangeStart, rangeEnd: old.rangeEnd };
+    if (!entry.blockId && durationHours(entry) > 1) Object.assign(entries, buildSegments(entry.text, entry.category, entry.start, entry.end, `migrated-${hour}-${entry.start}-${entry.end}`));
+    else entries[hour] = entry;
   });
   return { intention: value.intention ?? "", reflection: value.reflection ?? "", entries };
 }
@@ -58,6 +71,7 @@ export default function Home() {
   const [saved, setSaved] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [draft, setDraft] = useState<Entry & { slot: number }>({ slot: 9, text: "", category: "normal", ...defaultTimes(9) });
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const currentRow = useRef<HTMLDivElement>(null);
   const today = useMemo(() => new Date(), []);
   const key = dateKey(selectedDate);
@@ -82,17 +96,44 @@ export default function Home() {
   const totalHours = filled.reduce((sum, entry) => sum + durationHours(entry), 0);
   const usefulHours = filled.reduce((sum, entry) => sum + durationHours(entry) * categories[entry.category].score, 0);
   const quality = totalHours ? Math.round((usefulHours / totalHours) * 100) : 0;
+  const entryCount = new Set(Object.entries(day.entries).filter(([, entry]) => entry.text.trim()).map(([slot, entry]) => entry.blockId ?? `slot-${slot}`)).size;
 
   function changeDate(offset: number) { const next = new Date(selectedDate); next.setDate(next.getDate() + offset); setHydrated(false); setSelectedDate(next); }
   function updateEntry(hour: number, patch: Partial<Entry>) {
-    setDay((current) => ({ ...current, entries: { ...current.entries, [hour]: { text: current.entries[hour]?.text ?? "", category: current.entries[hour]?.category ?? "normal", ...(current.entries[hour] ?? defaultTimes(hour)), ...patch } } }));
+    setDay((current) => {
+      const entries = { ...current.entries };
+      const source = entries[hour];
+      if (source?.blockId) {
+        Object.keys(entries).forEach((slot) => {
+          if (entries[Number(slot)].blockId === source.blockId) entries[Number(slot)] = { ...entries[Number(slot)], ...patch };
+        });
+      } else {
+        entries[hour] = { text: source?.text ?? "", category: source?.category ?? "normal", ...(source ?? defaultTimes(hour)), ...patch };
+      }
+      return { ...current, entries };
+    });
   }
   function openEditor(hour: number) {
-    setDraft({ slot: hour, text: day.entries[hour]?.text ?? "", category: day.entries[hour]?.category ?? "normal", ...(day.entries[hour] ?? defaultTimes(hour)) });
+    const entry = day.entries[hour];
+    setEditingBlockId(entry?.blockId ?? null);
+    setDraft({ slot: hour, text: entry?.text ?? "", category: entry?.category ?? "normal", start: entry?.rangeStart ?? entry?.start ?? defaultTimes(hour).start, end: entry?.rangeEnd ?? entry?.end ?? defaultTimes(hour).end });
     setEditorOpen(true);
   }
-  function saveDraft() { const { slot, ...entry } = draft; updateEntry(slot, entry); setEditorOpen(false); }
-  function clearDraft() { setDay((current) => { const entries = { ...current.entries }; delete entries[draft.slot]; return { ...current, entries }; }); setEditorOpen(false); }
+  function saveDraft() {
+    const blockId = editingBlockId ?? `block-${Date.now()}`;
+    setDay((current) => {
+      const entries = { ...current.entries };
+      if (editingBlockId) Object.keys(entries).forEach((slot) => { if (entries[Number(slot)].blockId === editingBlockId) delete entries[Number(slot)]; });
+      else delete entries[draft.slot];
+      const segments = buildSegments(draft.text, draft.category, draft.start, draft.end, blockId);
+      const replacedBlocks = new Set(Object.keys(segments).map((slot) => entries[Number(slot)]?.blockId).filter((value): value is string => Boolean(value)));
+      Object.keys(entries).forEach((slot) => { if (entries[Number(slot)].blockId && replacedBlocks.has(entries[Number(slot)].blockId!)) delete entries[Number(slot)]; });
+      Object.assign(entries, segments);
+      return { ...current, entries };
+    });
+    setEditorOpen(false);
+  }
+  function clearDraft() { setDay((current) => { const entries = { ...current.entries }; if (editingBlockId) Object.keys(entries).forEach((slot) => { if (entries[Number(slot)].blockId === editingBlockId) delete entries[Number(slot)]; }); else delete entries[draft.slot]; return { ...current, entries }; }); setEditorOpen(false); }
   function jumpToNow() { setHydrated(false); setSelectedDate(new Date()); window.setTimeout(() => currentRow.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 120); }
   const dateLabel = new Intl.DateTimeFormat("en", { weekday: "long", month: "long", day: "numeric" }).format(selectedDate);
 
@@ -125,7 +166,7 @@ export default function Home() {
           <label className="intention-card"><Target /><span><small>TODAY&apos;S INTENTION</small><input value={day.intention} onChange={(event) => setDay((current) => ({ ...current, intention: event.target.value }))} placeholder="What would make today count?" maxLength={120} /></span><ChevronRight /></label>
 
           <section className="timeline" aria-label="Hourly log">
-            <div className="timeline-title"><div><Clock3 /><h2>Your timeline</h2></div><span>{filled.length} entries · {totalHours.toFixed(1)}h tracked</span></div>
+            <div className="timeline-title"><div><Clock3 /><h2>Your timeline</h2></div><span>{entryCount} entries · {totalHours.toFixed(1)}h tracked</span></div>
             <div className="hour-list">
               {Array.from({ length: 24 }, (_, hour) => {
                 const entry = day.entries[hour] ?? { text: "", category: "normal" as Category, ...defaultTimes(hour) };
@@ -165,9 +206,9 @@ export default function Home() {
 
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogContent className="time-dialog">
-          <DialogHeader><DialogTitle>Edit time block</DialogTitle><DialogDescription>Use the real start and finish—even when an activity crosses hourly lines.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Edit time block</DialogTitle><DialogDescription>Saving fills every hourly row covered by this time range.</DialogDescription></DialogHeader>
           <label className="dialog-field"><span>What did you do?</span><input value={draft.text} onChange={(event) => setDraft((current) => ({ ...current, text: event.target.value }))} placeholder="Gym session, client work, lunch…" autoFocus /></label>
-          <div className="time-fields"><label><span>Started</span><input type="time" value={draft.start} onChange={(event) => setDraft((current) => ({ ...current, start: event.target.value }))} /></label><div className="duration-pill"><Clock3 /><strong>{durationHours(draft).toFixed(2).replace(/0+$/, "").replace(/\.$/, "")}h</strong></div><label><span>Finished</span><input type="time" value={draft.end} onChange={(event) => setDraft((current) => ({ ...current, end: event.target.value }))} /></label></div>
+          <div className="time-fields"><label><span>Started</span><input type="time" value={draft.start} onChange={(event) => setDraft((current) => ({ ...current, start: event.target.value }))} /></label><div className="duration-pill"><Clock3 /><strong>{durationHours(draft).toFixed(2).replace(/0+$/, "").replace(/\.$/, "")}h</strong><span>· {coveredSlotCount(draft.start, draft.end)} rows</span></div><label><span>Finished</span><input type="time" value={draft.end} onChange={(event) => setDraft((current) => ({ ...current, end: event.target.value }))} /></label></div>
           <fieldset className="category-picker"><legend>Category</legend>{Object.entries(categories).map(([value, category]) => { const Icon = category.Icon; return <button type="button" key={value} className={draft.category === value ? "selected" : ""} style={{ "--pick": category.color, "--pick-bg": category.tint } as CSSProperties} onClick={() => setDraft((current) => ({ ...current, category: value as Category }))}><Icon /><span>{category.label}</span></button>; })}</fieldset>
           <DialogFooter><Button variant="ghost" className="delete-button" onClick={clearDraft}><Trash2 /> Clear entry</Button><Button className="save-block" onClick={saveDraft}><Check /> Save block</Button></DialogFooter>
         </DialogContent>
