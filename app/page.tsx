@@ -37,7 +37,6 @@ const dateKey = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1
 const minutes = (time: string) => { const [h, m] = time.split(":").map(Number); return h * 60 + m; };
 const timeFromMinutes = (value: number) => { const normalized = ((value % 1440) + 1440) % 1440; return `${pad(Math.floor(normalized / 60))}:${pad(normalized % 60)}`; };
 const displayMinute = (value: number) => { const normalized = value % 1440; const h = Math.floor(normalized / 60); const m = normalized % 60; return `${h % 12 || 12}:${pad(m)} ${h < 12 ? "AM" : "PM"}`; };
-const displayTime = (time: string) => displayMinute(minutes(time));
 const sameDay = (a: Date, b: Date) => dateKey(a) === dateKey(b);
 const legacyCategory = (value: string): Category => ({ focus: "deep", progress: "normal", maintenance: "chores", recharge: "free" }[value] as Category) || (value in categories ? value as Category : "normal");
 const blockDuration = (block: Pick<TimeBlock, "start" | "end">) => { let end = minutes(block.end); const start = minutes(block.start); if (end <= start) end += 1440; return (end - start) / 60; };
@@ -210,6 +209,11 @@ export default function Home() {
 
         <aside className="insights-column"><div className="insights-sticky"><p className="eyebrow dark"><BarChart3 /> TIME BY CATEGORY</p><div className="category-cloud">{Object.entries(categories).map(([value, category]) => { const Icon = category.Icon; const amount = blocks.filter((block) => block.category === value).reduce((sum, block) => sum + blockDuration(block), 0); return <div key={value} className={amount ? "category-stat active" : "category-stat"}><i style={{ background: category.color }}><Icon /></i><span>{category.label}</span><strong>{amount ? `${amount.toFixed(1)}h` : "—"}</strong></div>; })}</div><button className="now-button" onClick={jumpToNow}><TimerReset />Jump to current time</button></div></aside>
       </div>
+
+      <button className="mobile-add-shortcut" onClick={() => openNew()} aria-label="Add an activity at an exact time">
+        <Plus />
+        <span>Add time</span>
+      </button>
 
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogContent className="time-dialog">
