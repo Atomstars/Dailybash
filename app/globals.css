@@ -18,3 +18,22 @@
 @media(max-width:1000px){.page-shell{grid-template-columns:1fr;width:min(800px,calc(100% - 36px))}.insights-column{display:none}}
 @media(max-width:650px){.topbar{height:62px;padding:0 14px}.brand{font-size:1.1rem}.brand-mark{width:30px;height:30px}.save-state{font-size:.64rem}.avatar{width:32px;height:32px}.page-shell{width:calc(100% - 22px);padding:14px 0 105px}.workspace-head{margin-bottom:9px}.workspace-head>.exact-cta{display:none}.date-toolbar{display:grid;grid-template-columns:36px minmax(0,250px) 36px;width:100%;justify-content:center}.date-button{width:100%;min-width:0;padding:8px 12px}.date-button strong{font-size:.77rem}.summary-strip{grid-template-columns:1fr 1fr 1.25fr;min-height:80px;padding:12px 13px;border-radius:17px}.summary-heading{display:none}.summary-metric{min-height:40px;padding-left:10px}.summary-metric:first-of-type{padding-left:0;border-left:0}.summary-metric strong{font-size:1.05rem}.summary-signal{padding-left:10px}.summary-signal>div{margin-bottom:7px}.intention-card{margin-top:9px;padding:14px 16px}.intention-card input{font-size:.9rem}.timeline{margin-top:23px}.timeline-title>span{font-size:.65rem}.hour-list{gap:6px}.hour-row{grid-template-columns:64px 27px minmax(0,1fr);min-height:91px;padding:8px 8px}.time-label strong{font-size:.65rem}.timeline-node{width:23px;height:23px;border-radius:8px}.entry-surface{display:grid;grid-template-columns:1fr 34px;gap:4px}.entry-main{grid-column:1/-1}.entry-main input{height:34px;font-size:.82rem}.entry-surface [data-slot="native-select-wrapper"]{width:122px;min-width:0}.entry-surface select{height:29px;font-size:.64rem}.edit-button{width:31px;height:31px}.reflection-card{padding:20px}.mobile-score{position:fixed;z-index:40;left:9px;right:9px;bottom:9px;display:grid;grid-template-columns:auto auto auto;justify-content:space-between;align-items:center;gap:7px;padding:10px 11px 10px 16px;border:1px solid #3e4150;border-radius:18px;background:rgba(23,25,35,.96);color:#fff;box-shadow:0 18px 45px rgba(18,20,30,.35);backdrop-filter:blur(16px)}.mobile-score span{display:flex;flex-direction:column;color:#9298aa;font-size:.57rem}.mobile-score strong{color:#fff;font-size:.82rem}.mobile-score button{display:flex;align-items:center;gap:4px;white-space:nowrap;padding:10px 11px;border:0;border-radius:11px;background:#b9f36a;color:#202519;font-size:.63rem;font-weight:850}.mobile-score svg{width:13px}.time-dialog{max-height:calc(100vh - 20px);overflow:auto;padding:22px!important;border-radius:23px!important}.time-fields{grid-template-columns:1fr 1fr}.duration-pill{grid-column:1/-1;grid-row:2;justify-content:center;height:38px}.category-picker{grid-template-columns:repeat(2,1fr)}.category-picker button{min-height:57px;flex-direction:row;align-items:center;justify-content:flex-start;gap:8px}.time-dialog [data-slot="dialog-footer"]{display:flex;flex-direction:row}.delete-button{padding:0 9px}.save-block{min-width:120px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+
+/* Exact-time coverage: empty intervals stay visible and actionable. */
+.hour-row.is-gap{--cat:#a79df6;border-style:dashed;background:rgba(250,250,253,.66);box-shadow:none}
+.is-gap .timeline-node{background:#eeecff;color:#7569e8}
+.gap-action{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-width:0;height:100%;padding:0;border:0;background:transparent;text-align:left}
+.gap-action>span{display:flex;min-width:0;flex-direction:column;gap:3px}
+.gap-action strong{color:#6f7484;font-size:.84rem;font-weight:650}
+.gap-action small{color:#9a9eaa;font-size:.64rem}
+.gap-action b{flex:0 0 auto;padding:8px 10px;border-radius:10px;background:#eeecff;color:#6659df;font-size:.67rem;transition:.2s}
+.hour-row.is-gap:hover .gap-action b,.gap-action:focus-visible b{background:#6c60e6;color:#fff;transform:translateX(-2px)}
+
+@media(max-width:650px){
+  .page-shell{padding-bottom:48px}
+  .hour-row{min-height:79px}
+  .gap-action{gap:7px}
+  .gap-action strong{font-size:.75rem}
+  .gap-action small{font-size:.58rem}
+  .gap-action b{padding:7px 8px;font-size:.6rem}
+}
